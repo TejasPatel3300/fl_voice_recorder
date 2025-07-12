@@ -137,11 +137,6 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
             _buildText(),
           ],
         ),
-        if (_amplitude != null) ...[
-          const SizedBox(height: 40),
-          Text('Current: ${_amplitude?.current ?? 0.0}'),
-          Text('Max: ${_amplitude?.max ?? 0.0}'),
-        ],
       ],
     );
   }
@@ -160,11 +155,11 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
     late Color color;
 
     if (_recordState != RecordState.stop) {
-      icon = const Icon(Icons.stop, color: Colors.red, size: 30);
+      icon = Icon(Icons.stop, color: Theme.of(context).colorScheme.primary, size: 30);
       color = Colors.red.withValues(alpha: 0.1);
     } else {
       final theme = Theme.of(context);
-      icon = Icon(Icons.mic, size: 30);
+      icon = Icon(Icons.mic, color: Theme.of(context).colorScheme.primary, size: 30);
       color = theme.primaryColor.withValues(alpha: 0.1);
     }
 
@@ -190,11 +185,11 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
     late Color color;
 
     if (_recordState == RecordState.record) {
-      icon = const Icon(Icons.pause, color: Colors.red, size: 30);
+      icon = Icon(Icons.pause, color: Theme.of(context).colorScheme.primary, size: 30);
       color = Colors.red.withValues(alpha: 0.1);
     } else {
       final theme = Theme.of(context);
-      icon = const Icon(Icons.play_arrow, color: Colors.red, size: 30);
+      icon = Icon(Icons.play_arrow, color: Theme.of(context).colorScheme.primary, size: 30);
       color = theme.primaryColor.withValues(alpha: 0.1);
     }
 
@@ -225,7 +220,7 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
 
     return Text(
       '$minutes : $seconds',
-      style: const TextStyle(color: Colors.red),
+      style: TextStyle(color: Theme.of(context).colorScheme.primary,),
     );
   }
 

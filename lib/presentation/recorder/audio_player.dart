@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:audioplayers/audioplayers.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:just_waveform/just_waveform.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:voice_recorder/presentation/recorder/sinewave_visualizer.dart';
 import 'package:voice_recorder/presentation/recorder/waveform.dart';
 
 class AudioPlayer extends StatefulWidget {
@@ -35,6 +37,7 @@ class AudioPlayerState extends State<AudioPlayer> {
   Duration? _position;
   Duration? _duration;
   double _progress = 0;
+  List<double> _visibleAmplitude = []; // sine visualizer
   Waveform? _currentFileWaveForm;
 
   @override
@@ -44,14 +47,15 @@ class AudioPlayerState extends State<AudioPlayer> {
     });
     _positionChangedSubscription = _audioPlayer.onPositionChanged.listen(
       (position) => setState(() {
-        if (_currentFileWaveForm != null) {
-          final waveFormDuration = _currentFileWaveForm?.duration.inMilliseconds ?? 0;
+        final currentFileWaveForm = _currentFileWaveForm;
+        if (currentFileWaveForm != null) {
+          final waveFormDuration = currentFileWaveForm?.duration.inMilliseconds ?? 0;
           if (waveFormDuration > 0) {
             setState(() {
               _progress = position.inMilliseconds / waveFormDuration;
             });
           }
-
+          _visibleAmplitude = getAmplitudeWindow(position);
         }
         _position = position;
       }),
@@ -66,6 +70,30 @@ class AudioPlayerState extends State<AudioPlayer> {
     _prepareAudioWaveProcessStream(File(widget.source));
 
     super.initState();
+  }
+
+  List<double> getAmplitudeWindow(Duration pos, {int windowSize = 100}) {
+    final waveform = _currentFileWaveForm!;
+    final centerPixel = waveform.positionToPixel(pos).round();
+
+    int start = (centerPixel - windowSize ~/ 2).clamp(0, waveform.length - 1);
+    int end = (start + windowSize).clamp(0, waveform.length);
+
+    List<double> amplitudes = [];
+
+    for (int i = start; i < end; i++) {
+      int min = waveform.getPixelMin(i);
+      int max = waveform.getPixelMax(i);
+      int diff = (max - min).abs();
+
+      // Normalize based on bit depth
+      double norm = waveform.flags == 1 ? diff / 255.0 : diff / 65535.0;
+
+      // Boost amplitude range for visibility
+      double boosted = pow(norm, 0.5).toDouble().clamp(0.0, 1.0);
+
+      amplitudes.add(boosted);}
+    return amplitudes;
   }
 
   @override
@@ -85,7 +113,15 @@ class AudioPlayerState extends State<AudioPlayer> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (_currentFileWaveForm != null) ...[
-              Expanded(child: WaveformWidget(waveform: _currentFileWaveForm!, progress: _progress)),
+              // Expanded(child: WaveformWidget(waveform: _currentFileWaveForm!, progress: _progress)), // waveform visualizer
+              Expanded(
+                child: SmoothWaveformVisualizer(
+                  waveform: _currentFileWaveForm!,
+                  amplitudes: _visibleAmplitude,
+                  progress: _progress,
+                ),
+              ),
+              // sine visualizer
             ],
             Row(
               mainAxisSize: MainAxisSize.max,
@@ -202,4 +238,3 @@ class AudioPlayerState extends State<AudioPlayer> {
     }
   }
 }
-

@@ -9,7 +9,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(colorSchemeSeed: Colors.black54, brightness: Brightness.dark),
+    theme: ThemeData(colorSchemeSeed: Colors.teal, brightness: Brightness.dark),
     home: VoiceRecorderScreen(),
   );
 }
