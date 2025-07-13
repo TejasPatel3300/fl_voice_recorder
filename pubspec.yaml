@@ -36,9 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   audioplayers:
   record:
-  rxdart:
   just_waveform:
   path_provider:
+  provider: 
 
 dev_dependencies:
   flutter_test:

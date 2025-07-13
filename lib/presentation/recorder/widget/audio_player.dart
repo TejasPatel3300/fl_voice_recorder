@@ -9,8 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:just_waveform/just_waveform.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:voice_recorder/presentation/recorder/sinewave_visualizer.dart';
-import 'package:voice_recorder/presentation/recorder/waveform.dart';
+import 'package:provider/provider.dart';
+import 'package:voice_recorder/constants/constants.dart';
+import 'package:voice_recorder/presentation/recorder/widget/sinewave_visualizer.dart';
+import 'package:voice_recorder/presentation/recorder/widget/waveform.dart';
+import 'package:voice_recorder/provider/settings_provider.dart';
+import 'package:voice_recorder/utils/date_time_utils.dart';
 
 class AudioPlayer extends StatefulWidget {
   /// Path from where to play recorded audio
@@ -34,45 +38,59 @@ class AudioPlayerState extends State<AudioPlayer> {
   late StreamSubscription<void> _playerStateChangedSubscription;
   late StreamSubscription<Duration?> _durationChangedSubscription;
   late StreamSubscription<Duration> _positionChangedSubscription;
-  Duration? _position;
-  Duration? _duration;
+
   double _progress = 0;
   List<double> _visibleAmplitude = []; // sine visualizer
+
+  Duration? _position;
+  Duration? _duration;
   Waveform? _currentFileWaveForm;
 
   @override
   void initState() {
-    _playerStateChangedSubscription = _audioPlayer.onPlayerComplete.listen((state) async {
-      await stop();
-    });
-    _positionChangedSubscription = _audioPlayer.onPositionChanged.listen(
-      (position) => setState(() {
-        final currentFileWaveForm = _currentFileWaveForm;
-        if (currentFileWaveForm != null) {
-          final waveFormDuration = currentFileWaveForm?.duration.inMilliseconds ?? 0;
-          if (waveFormDuration > 0) {
-            setState(() {
-              _progress = position.inMilliseconds / waveFormDuration;
-            });
-          }
-          _visibleAmplitude = getAmplitudeWindow(position);
-        }
-        _position = position;
-      }),
-    );
-    _durationChangedSubscription = _audioPlayer.onDurationChanged.listen(
-      (duration) => setState(() {
-        _duration = duration;
-      }),
-    );
-
+    _initializePlayerListeners();
     _audioPlayer.setSource(_source);
     _prepareAudioWaveProcessStream(File(widget.source));
 
     super.initState();
   }
 
-  List<double> getAmplitudeWindow(Duration pos, {int windowSize = 100}) {
+  @override
+  Widget build(BuildContext context) {
+    final visualizer = context.watch<SettingsProvider>().visualizer;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Expanded(child: _currentFileWaveForm != null ? _buildVisualizer(visualizer): const SizedBox()),
+            Row(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                _buildControl(),
+                _buildSlider(constraints.maxWidth),
+                IconButton(
+                  icon: Icon(Icons.delete, size: _deleteBtnSize, color: Theme.of(context).colorScheme.primary),
+                  onPressed: () {
+                    if (_audioPlayer.state == ap.PlayerState.playing) {
+                      _stop().then((value) => widget.onDelete());
+                    } else {
+                      widget.onDelete();
+                    }
+                  },
+                ),
+              ],
+            ),
+            Text(getDurationText(_duration?.inSeconds ?? 0)),
+            SizedBox(height: 30),
+          ],
+        );
+      },
+    );
+  }
+
+  List<double> _getAmplitudeWindow(Duration pos, {int windowSize = 100}) {
     final waveform = _currentFileWaveForm!;
     final centerPixel = waveform.positionToPixel(pos).round();
 
@@ -92,60 +110,9 @@ class AudioPlayerState extends State<AudioPlayer> {
       // Boost amplitude range for visibility
       double boosted = pow(norm, 0.5).toDouble().clamp(0.0, 1.0);
 
-      amplitudes.add(boosted);}
+      amplitudes.add(boosted);
+    }
     return amplitudes;
-  }
-
-  @override
-  void dispose() {
-    _playerStateChangedSubscription.cancel();
-    _positionChangedSubscription.cancel();
-    _durationChangedSubscription.cancel();
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_currentFileWaveForm != null) ...[
-              // Expanded(child: WaveformWidget(waveform: _currentFileWaveForm!, progress: _progress)), // waveform visualizer
-              Expanded(
-                child: SmoothWaveformVisualizer(
-                  waveform: _currentFileWaveForm!,
-                  amplitudes: _visibleAmplitude,
-                  progress: _progress,
-                ),
-              ),
-              // sine visualizer
-            ],
-            Row(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                _buildControl(),
-                _buildSlider(constraints.maxWidth),
-                IconButton(
-                  icon: const Icon(Icons.delete, size: _deleteBtnSize),
-                  onPressed: () {
-                    if (_audioPlayer.state == ap.PlayerState.playing) {
-                      stop().then((value) => widget.onDelete());
-                    } else {
-                      widget.onDelete();
-                    }
-                  },
-                ),
-              ],
-            ),
-            Text('${_duration ?? 0.0}'),
-          ],
-        );
-      },
-    );
   }
 
   Widget _buildControl() {
@@ -154,11 +121,10 @@ class AudioPlayerState extends State<AudioPlayer> {
 
     if (_audioPlayer.state == ap.PlayerState.playing) {
       icon = const Icon(Icons.pause, size: 30);
-      color = Colors.red.withValues(alpha: 0.1);
+      color = Theme.of(context).colorScheme.primary.withValues(alpha: 0.1);
     } else {
-      final theme = Theme.of(context);
       icon = Icon(Icons.play_arrow, size: 30);
-      color = theme.primaryColor.withValues(alpha: 0.1);
+      color = Theme.of(context).colorScheme.primary.withValues(alpha: 0.1);
     }
 
     return ClipOval(
@@ -168,9 +134,9 @@ class AudioPlayerState extends State<AudioPlayer> {
           child: SizedBox(width: _controlSize, height: _controlSize, child: icon),
           onTap: () {
             if (_audioPlayer.state == ap.PlayerState.playing) {
-              pause();
+              _pause();
             } else {
-              play();
+              _play();
             }
           },
         ),
@@ -209,14 +175,27 @@ class AudioPlayerState extends State<AudioPlayer> {
     );
   }
 
-  Future<void> play() => _audioPlayer.play(_source);
+  Widget _buildVisualizer(VisualizerType visualizer) {
+    switch (visualizer) {
+      case VisualizerType.waveform:
+        return WaveformWidget(waveform: _currentFileWaveForm!, progress: _progress);
+      case VisualizerType.sinewave:
+        return SmoothWaveformVisualizer(
+          waveform: _currentFileWaveForm!,
+          amplitudes: _visibleAmplitude,
+          progress: _progress,
+        );
+    }
+  }
 
-  Future<void> pause() async {
+  Future<void> _play() => _audioPlayer.play(_source);
+
+  Future<void> _pause() async {
     await _audioPlayer.pause();
     setState(() {});
   }
 
-  Future<void> stop() async {
+  Future<void> _stop() async {
     await _audioPlayer.stop();
     setState(() {});
   }
@@ -231,10 +210,52 @@ class AudioPlayerState extends State<AudioPlayer> {
         final progress = (100 * event.progress).toInt();
         if (progress == 100) {
           _currentFileWaveForm = event.waveform;
+          setState(() {});
         }
       });
     } catch (e, st) {
       debugPrint('Error while preparing audio wave form: $e\nStackTrace: $st');
     }
+  }
+
+  void _initializePlayerListeners() {
+    _playerStateChangedSubscription = _audioPlayer.onPlayerComplete.listen((_) async => await _stop());
+
+    _positionChangedSubscription = _audioPlayer.onPositionChanged.listen(_handlePositionChanged);
+
+    _durationChangedSubscription = _audioPlayer.onDurationChanged.listen(
+      (duration) => setState(() {
+        _duration = duration;
+      }),
+    );
+  }
+
+  void _handlePositionChanged(Duration position) {
+    final waveform = _currentFileWaveForm;
+    double progress = 0.0;
+    List<double> visibleAmp = [];
+
+    if (waveform != null) {
+      final durationMs = waveform.duration.inMilliseconds;
+      if (durationMs > 0) {
+        progress = position.inMilliseconds / durationMs;
+      }
+      visibleAmp = _getAmplitudeWindow(position);
+    }
+
+    setState(() {
+      _position = position;
+      _progress = progress;
+      _visibleAmplitude = visibleAmp;
+    });
+  }
+
+  @override
+  void dispose() {
+    _playerStateChangedSubscription.cancel();
+    _positionChangedSubscription.cancel();
+    _durationChangedSubscription.cancel();
+    _audioPlayer.dispose();
+    super.dispose();
   }
 }

@@ -1,16 +1,13 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'dart:async';
-
 import 'package:just_waveform/just_waveform.dart';
 
 
 class SmoothWaveformVisualizer extends StatelessWidget{
   final Waveform waveform;
   final List<double> amplitudes; // normalized between -1 and 1
-  final double progress; // Optional: for syncing or scrolling
+  final double progress; // for syncing or scrolling
 
   const SmoothWaveformVisualizer({
     super.key,
@@ -24,7 +21,7 @@ class SmoothWaveformVisualizer extends StatelessWidget{
       painter: SmoothWaveformPainter(
         amplitudes: amplitudes,
         color: Theme.of(context).colorScheme.primary,
-        progress: progress, // optional
+        progress: progress,
       ),
       size: Size.infinite,
     );
@@ -34,7 +31,7 @@ class SmoothWaveformVisualizer extends StatelessWidget{
 
 class SmoothWaveformPainter extends CustomPainter {
   final List<double> amplitudes; // normalized between -1 and 1
-  final double progress; // Optional: for syncing or scrolling
+  final double progress; // for syncing or scrolling
   final Color color;
 
   SmoothWaveformPainter({
@@ -106,10 +103,9 @@ class SmoothWaveformPainter extends CustomPainter {
       canvas.drawPath(path, paint);
     }
 
-    // === Optional dynamic highlight at peak loudness ===
     double peakAmp = amplitudes.reduce((a, b) => a > b ? a : b);
     final glowPaint = Paint()
-      ..color = color.withOpacity((peakAmp * 0.7).clamp(0.1, 0.6))
+      ..color = color.withValues(alpha:(peakAmp * 0.7).clamp(0.1, 0.6))
       ..strokeWidth = 5
       ..style = PaintingStyle.stroke
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 6);
@@ -158,9 +154,9 @@ class SmoothWaveformPainter extends CustomPainter {
   //
   //   // === Layer settings ===
   //   final List<Color> layerColors = [
-  //     color.withOpacity(0.8), // primary wave
-  //     color.withOpacity(0.3), // shadow 1
-  //     color.withOpacity(0.15), // shadow 2
+  //     color.withValues(alpha:0.8), // primary wave
+  //     color.withValues(alpha:0.3), // shadow 1
+  //     color.withValues(alpha:0.15), // shadow 2
   //   ];
   //
   //   final List<double> amplitudeMultipliers = [1.0, 0.6, 0.3];
@@ -204,7 +200,7 @@ class SmoothWaveformPainter extends CustomPainter {
   //   // === Optional dynamic highlight at peak loudness ===
   //   double peakAmp = amplitudes.reduce((a, b) => a > b ? a : b);
   //   final glowPaint = Paint()
-  //     ..color = color.withOpacity((peakAmp * 0.7).clamp(0.1, 0.6))
+  //     ..color = color.withValues(alpha:(peakAmp * 0.7).clamp(0.1, 0.6))
   //     ..strokeWidth = 5
   //     ..style = PaintingStyle.stroke
   //     ..maskFilter = MaskFilter.blur(BlurStyle.normal, 6);

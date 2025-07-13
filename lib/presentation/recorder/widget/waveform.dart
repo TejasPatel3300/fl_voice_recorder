@@ -16,6 +16,7 @@ class WaveformWidget extends StatelessWidget {
         length: waveform.length,
         samplesPerPixel: waveform.samplesPerPixel,
         resolution: waveform.flags == 1 ? 8 : 16,
+        color: Theme.of(context).colorScheme.primary,
       ),
       size: Size.infinite,
     );
@@ -27,6 +28,7 @@ class WaveformPainter extends CustomPainter {
   final double progress; // 0.0 to 1.0 (current audio position / duration)
   final int length;
   final int samplesPerPixel;
+  final Color color;
   final int resolution; // 8 or 16 bit
 
   WaveformPainter({
@@ -35,6 +37,7 @@ class WaveformPainter extends CustomPainter {
     required this.length,
     required this.samplesPerPixel,
     required this.resolution,
+    required this.color,
   });
 
   double normalize(int value) {
@@ -45,8 +48,8 @@ class WaveformPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final barWidth = size.width / length;
     final midY = size.height / 2;
-    final activePaint = Paint()..color = Colors.blueAccent;
-    final inactivePaint = Paint()..color = Colors.grey.withOpacity(0.3);
+    final activePaint = Paint()..color = color;
+    final inactivePaint = Paint()..color = Colors.grey.withValues(alpha:0.3);
 
     for (int i = 0; i < length; i++) {
       int min = data[2 * i];
